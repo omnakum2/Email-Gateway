@@ -13,6 +13,8 @@ export class NodemailerProvider implements MailProvider {
       port: Number(process.env.EMAIL_PORT),
       secure: false,
       requireTLS: true,
+      logger: true,
+      debug: true,
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
