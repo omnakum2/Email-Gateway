@@ -1,27 +1,25 @@
 import express from 'express';
-import { apiKeyGuard } from './middleware/apiKey';
-import { rateLimiter } from './middleware/rateLimit';
 import { errorHandler } from './middleware/errorHandler';
 import { emailRouter } from './routes/emailRoute';
+import { publicEmailRouter } from './routes/publicEmailRoute';
 import { ok } from './utils/http';
 
 // Assemble the Express app (no listen here → unit-testable).
+// Each route carries its own guards, so the two tiers stay independent:
+//   /send         → secret API key (server-to-server)
+//   /public-send  → public key + origin allowlist + strict rate limit (browser)
 export function buildApp() {
   const app = express();
 
   app.use(express.json());
 
-  // Public health check (before auth + rate limiting).
+  // Public, unauthenticated health probe.
   app.get('/health', (_req, res) => {
     ok(res, { status: 'ok' });
   });
 
-  // Rate-limit first so auth attempts are throttled too, then require the API key.
-  app.use(rateLimiter);
-  app.use(apiKeyGuard);
-
-  // Protected routes.
   app.use(emailRouter);
+  app.use(publicEmailRouter);
 
   // Error handler must be registered last.
   app.use(errorHandler);

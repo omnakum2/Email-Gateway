@@ -1,0 +1,26 @@
+import { Request, Response, NextFunction } from 'express';
+import { fail } from '../utils/http';
+import { safeEqual, allowedOrigins } from '../utils/security';
+
+// Guards the public browser route: enforces the origin allowlist server-side
+// (CORS alone is only a browser rule), then checks the public key.
+export function publicKeyGuard(req: Request, res: Response, next: NextFunction): void {
+  const origins = allowedOrigins();
+  const origin = req.header('Origin') || '';
+  if (origins.length > 0 && !origins.includes(origin)) {
+    fail(res, 403, 'Origin not allowed');
+    return;
+  }
+
+  const configured = process.env.PUBLIC_KEY || '';
+  if (!configured) {
+    fail(res, 500, 'PUBLIC_KEY is not configured on the server');
+    return;
+  }
+  const provided = req.header('x-public-key') || '';
+  if (!safeEqual(provided, configured)) {
+    fail(res, 401, 'Invalid or missing public key');
+    return;
+  }
+  next();
+}

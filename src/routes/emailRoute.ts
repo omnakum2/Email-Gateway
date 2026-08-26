@@ -6,6 +6,9 @@ import { fail, ok } from '../utils/http';
 import { isEmail, toArray } from '../utils/validation';
 import { sendMail } from '../mailer/mailer';
 import { Attachment } from '../mailer/types';
+import { rateLimiter } from '../middleware/rateLimit';
+import { apiKeyGuard } from '../middleware/apiKey';
+import { requireEnabled } from '../middleware/toggle';
 
 // Attachments held in memory (never written to disk), with size + count caps.
 const upload = multer({
@@ -15,9 +18,16 @@ const upload = multer({
 
 export const emailRouter = Router();
 
-// POST /send — send one email, with optional attachments.
-// Accepts multipart/form-data (with files) or application/json (no files).
-emailRouter.post('/send', upload.array('files', MAX_ATTACHMENT_COUNT), async (req, res) => {
+// POST /send — secret, server-to-server. Send one email to any recipient,
+// with optional attachments. Accepts multipart/form-data or application/json.
+// Rate-limited first (throttles brute force), then requires the secret API key.
+emailRouter.post(
+  '/send',
+  requireEnabled('SEND_ENABLED'),
+  rateLimiter,
+  apiKeyGuard,
+  upload.array('files', MAX_ATTACHMENT_COUNT),
+  async (req, res) => {
   try {
     const to: string | undefined = req.body.to;
     const subject: string | undefined = req.body.subject;

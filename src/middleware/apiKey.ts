@@ -1,16 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
-import { timingSafeEqual } from 'crypto';
 import { fail } from '../utils/http';
+import { safeEqual } from '../utils/security';
 
-// Constant-time string comparison (length mismatch short-circuits to false).
-function safeEqual(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) return false;
-  return timingSafeEqual(bufA, bufB);
-}
-
-// Rejects any request without a matching x-api-key header.
+// Rejects any request without a matching x-api-key header (secret, server-to-server).
 export function apiKeyGuard(req: Request, res: Response, next: NextFunction): void {
   const configured = process.env.API_KEY || '';
   if (!configured) {

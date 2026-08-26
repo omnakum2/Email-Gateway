@@ -39,7 +39,7 @@ export async function sendMail(input: SendMailInput): Promise<string> {
     subject: input.subject,
     text: input.text,
     html,
-    replyTo: process.env.DEFAULT_REPLY_TO || undefined,
+    replyTo: input.replyTo || process.env.DEFAULT_REPLY_TO || undefined,
     attachments: input.attachments,
   });
 
