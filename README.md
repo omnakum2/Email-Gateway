@@ -1,98 +1,88 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Email Gateway
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A lightweight Node + Express + TypeScript service that sends **one email per request**, with optional file attachments. No database, no auth server — a single API-key-protected endpoint over Nodemailer, organized into small functional modules (bootstrap / app / config / middleware / routes / mailer / utils).
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
-
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
+## Setup
 
 ```bash
-$ npm install
+npm install
+cp .env.example .env   # then fill in real values
 ```
 
-## Compile and run the project
+| Var | Purpose |
+|-----|---------|
+| `PORT` | HTTP port (default 3000) |
+| `EMAIL_HOST` / `EMAIL_PORT` | SMTP host/port (Gmail: `smtp.gmail.com` / `587`) |
+| `EMAIL_USER` / `EMAIL_PASS` | SMTP user + **Gmail App Password** |
+| `DEFAULT_FROM_NAME` | Sender display name |
+| `DEFAULT_REPLY_TO` | Optional reply-to address |
+| `API_KEY` | Shared key required in the `x-api-key` header |
+| `RATE_LIMIT_WINDOW_MS` | Rate-limit window in ms (default 60000) |
+| `RATE_LIMIT_MAX` | Max requests per window per IP (default 20) |
+
+`EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USER`, `EMAIL_PASS`, and `API_KEY` are **required** — the server validates them and verifies the SMTP connection at startup, exiting if either fails.
+
+## Run
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm run dev      # ts-node, no build
+npm run build    # tsc -> dist/
+npm start        # node dist/index.js
 ```
 
-## Run tests
+## API
+
+### `GET /health`
+Open, unauthenticated. Returns `{ success: true, status: "ok" }`.
+
+### `POST /send`
+Requires header `x-api-key: <API_KEY>`. Accepts **`multipart/form-data`** (with files) or **`application/json`** (no files).
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `to` | yes | single recipient email |
+| `subject` | yes | |
+| `html` | no | custom HTML design; if omitted, a minimal default template is used |
+| `text` | no | plain-text version |
+| `cc`, `bcc` | no | string, repeated field, or JSON-array string |
+| `files` | no | up to 5 attachments, 10 MB each; allowed: pdf, csv, xlsx, docx, jpg, jpeg, png |
+
+**Success:** `200 { success: true, messageId }`
+**Errors:** `400` validation · `401` bad/missing API key · `429` rate limited · `500` send failure
+
+### Examples
+
+JSON (no attachment):
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+curl -X POST http://localhost:3000/send \
+  -H "x-api-key: YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"to":"john@example.com","subject":"Hello","text":"Hi there"}'
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+With an attachment:
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+curl -X POST http://localhost:3000/send \
+  -H "x-api-key: YOUR_KEY" \
+  -F "to=john@example.com" \
+  -F "subject=Report" \
+  -F "text=See attached" \
+  -F "files=@./report.pdf"
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## Structure
 
-## Resources
+```
+src/
+  index.ts            # bootstrap: validate env, verify SMTP, start server, graceful shutdown
+  app.ts              # assembles the Express app (middleware + routes)
+  config/constants.ts # attachment rules
+  middleware/         # apiKey (constant-time), rateLimit (env-driven), errorHandler
+  routes/             # health.route, email.route
+  mailer/             # mailer (transporter + sendMail + verify), template, types
+  utils/              # http (fail/ok helpers), validation (isEmail, toArray)
+```
 
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+> Server-to-server only. Do not call this from a browser — the API key would be exposed.
