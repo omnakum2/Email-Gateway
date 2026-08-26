@@ -1,12 +1,16 @@
 import { Router } from 'express';
 import multer from 'multer';
 import * as path from 'path';
-import { ALLOWED_EXTENSIONS, MAX_FILE_SIZE, MAX_ATTACHMENT_COUNT } from '../constants';
+import {
+  ALLOWED_EXTENSIONS,
+  MAX_FILE_SIZE,
+  MAX_TOTAL_FILE_SIZE,
+  MAX_ATTACHMENT_COUNT,
+} from '../constants';
 import { fail, ok } from '../utils/http';
 import { isEmail, toArray } from '../utils/validation';
 import { sendMail } from '../mailer/mailer';
 import { Attachment } from '../mailer/types';
-import { rateLimiter } from '../middleware/rateLimit';
 import { apiKeyGuard } from '../middleware/apiKey';
 import { requireEnabled } from '../middleware/toggle';
 
@@ -20,11 +24,10 @@ export const emailRouter = Router();
 
 // POST /send-email — secret, server-to-server. Send one email to any recipient,
 // with optional attachments. Accepts multipart/form-data or application/json.
-// Rate-limited first (throttles brute force), then requires the secret API key.
+// Kill-switch first, then requires the secret API key.
 emailRouter.post(
   '/send-email',
   requireEnabled('SEND_ENABLED'),
-  rateLimiter,
   apiKeyGuard,
   upload.array('files', MAX_ATTACHMENT_COUNT),
   async (req, res) => {
@@ -51,6 +54,14 @@ emailRouter.post(
 
     // --- attachments ---
     const files = (req.files as Express.Multer.File[] | undefined) || [];
+
+    // Guard the combined size (multer's fileSize is per-file, so 5 x 4 MB
+    // could otherwise reach 20 MB — well over the serverless body limit).
+    const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+    if (totalSize > MAX_TOTAL_FILE_SIZE) {
+      return fail(res, 400, `Total attachment size exceeds ${MAX_TOTAL_FILE_SIZE / (1024 * 1024)} MB`);
+    }
+
     const attachments: Attachment[] = [];
     for (const file of files) {
       const ext = path.extname(file.originalname).toLowerCase().replace('.', '');

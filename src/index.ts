@@ -1,51 +1,44 @@
-import 'dotenv/config'; // must load env before anything reads process.env
-import { buildApp } from './app';
-import { verifyConnection } from './mailer/mailer';
+import 'dotenv/config'; // load env before anything reads process.env
+import * as dns from 'node:dns';
+dns.setDefaultResultOrder('ipv4first'); // prefer IPv4 so Gmail SMTP connects reliably on serverless
 
-const REQUIRED_ENV = ['EMAIL_HOST', 'EMAIL_PORT', 'EMAIL_USER', 'EMAIL_PASS', 'API_KEY'];
+import express from 'express';
+import { errorHandler } from './middleware/errorHandler';
+import { emailRouter } from './routes/emailRoute';
+import { publicEmailRouter } from './routes/publicEmailRoute';
+import { ok } from './utils/http';
 
-// Fail fast if any required env var is missing.
-function validateEnv(): void {
-  const missing = REQUIRED_ENV.filter((key) => !process.env[key]);
-  if (missing.length > 0) {
-    console.error(`Missing required environment variables: ${missing.join(', ')}`);
-    process.exit(1);
-  }
-}
+// Assemble the Express app. Each route carries its own guards:
+//   /send-email         → secret API key (server-to-server)
+//   /send-public-email  → public key + origin allowlist (browser contact form)
+export function buildApp() {
+  const app = express();
 
-async function bootstrap(): Promise<void> {
-  validateEnv();
+  app.use(express.json());
 
-  // Fail fast if credentials/connection are bad.
-  try {
-    await verifyConnection();
-    console.log('connection verified');
-  } catch (err: any) {
-    console.error(`verification failed: ${err?.message || err}`);
-    process.exit(1);
-  }
-
-  const app = buildApp();
-  const port = Number(process.env.PORT) || 3000;
-
-  const server = app.listen(port);
-
-  server.on('error', (err: NodeJS.ErrnoException) => {
-    if (err.code === 'EADDRINUSE') {
-      console.error(`Port ${port} is already in use.`);
-    } else {
-      console.error(`Server error: ${err.message}`);
-    }
-    process.exit(1);
+  // Public, unauthenticated health probe.
+  app.get('/health', (_req, res) => {
+    ok(res, { status: 'ok' });
   });
 
-  // Graceful shutdown.
-  const shutdown = (signal: string) => {
-    console.log(`${signal} received, shutting down...`);
-    server.close(() => process.exit(0));
-  };
-  process.on('SIGINT', () => shutdown('SIGINT'));
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  app.use(emailRouter);
+  app.use(publicEmailRouter);
+
+  // Error handler must be registered last.
+  app.use(errorHandler);
+
+  return app;
 }
 
-bootstrap();
+const app = buildApp();
+
+// Vercel imports this default export and runs the app as a serverless function.
+export default app;
+
+// Local dev only — Vercel sets process.env.VERCEL and provides its own server.
+if (!process.env.VERCEL) {
+  const port = Number(process.env.PORT) || 3000;
+  app.listen(port, () => {
+    console.log(`Email gateway listening on http://localhost:${port}`);
+  });
+}

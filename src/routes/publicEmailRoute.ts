@@ -4,7 +4,6 @@ import { isEmail } from '../utils/validation';
 import { sendMail } from '../mailer/mailer';
 import { publicCors } from '../middleware/publicCors';
 import { publicKeyGuard } from '../middleware/publicKey';
-import { publicRateLimiter } from '../middleware/rateLimit';
 import { requireEnabled } from '../middleware/toggle';
 
 export const publicEmailRouter = Router();
@@ -20,7 +19,6 @@ publicEmailRouter.post(
   '/send-public-email',
   publicCors,
   requireEnabled('PUBLIC_SEND_ENABLED'),
-  publicRateLimiter,
   publicKeyGuard,
   async (req, res) => {
     try {

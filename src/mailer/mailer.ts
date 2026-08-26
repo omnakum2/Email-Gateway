@@ -18,11 +18,6 @@ const transporter = nodemailer.createTransport({
   greetingTimeout: 10_000,
 });
 
-// Verify SMTP connection + credentials. Called once at startup to fail fast.
-export async function verifyConnection(): Promise<void> {
-  await transporter.verify();
-}
-
 // Send a single email. Returns the provider message id.
 export async function sendMail(input: SendMailInput): Promise<string> {
   const fromName = process.env.DEFAULT_FROM_NAME || 'Email Gateway';
