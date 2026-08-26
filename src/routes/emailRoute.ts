@@ -18,11 +18,11 @@ const upload = multer({
 
 export const emailRouter = Router();
 
-// POST /send — secret, server-to-server. Send one email to any recipient,
+// POST /send-email — secret, server-to-server. Send one email to any recipient,
 // with optional attachments. Accepts multipart/form-data or application/json.
 // Rate-limited first (throttles brute force), then requires the secret API key.
 emailRouter.post(
-  '/send',
+  '/send-email',
   requireEnabled('SEND_ENABLED'),
   rateLimiter,
   apiKeyGuard,

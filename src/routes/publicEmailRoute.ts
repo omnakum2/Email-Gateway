@@ -10,14 +10,14 @@ import { requireEnabled } from '../middleware/toggle';
 export const publicEmailRouter = Router();
 
 // CORS preflight for the browser.
-publicEmailRouter.options('/public-send', publicCors);
+publicEmailRouter.options('/send-public-email', publicCors);
 
-// POST /public-send — contact-form endpoint safe for direct browser calls.
+// POST /send-public-email — contact-form endpoint safe for direct browser calls.
 // The recipient is ALWAYS the server-configured PUBLIC_TO; callers cannot set it,
 // so a leaked public key can never be used as an open relay to arbitrary addresses.
-// Accepts only: text (required), subject (optional), replyTo (optional, the lead's email).
+// Accepts only: text (required), subject (optional).
 publicEmailRouter.post(
-  '/public-send',
+  '/send-public-email',
   publicCors,
   requireEnabled('PUBLIC_SEND_ENABLED'),
   publicRateLimiter,
@@ -31,18 +31,13 @@ publicEmailRouter.post(
 
       const text: string | undefined = req.body.text;
       const subject: string = (req.body.subject || 'New contact form submission').trim();
-      const replyTo: string | undefined = req.body.replyTo;
 
       if (!text || !text.trim()) {
         return fail(res, 400, 'A message `text` is required');
       }
-      if (replyTo && !isEmail(replyTo)) {
-        return fail(res, 400, '`replyTo` must be a valid email address');
-      }
-
       // No caller-supplied `to`/`html`/attachments: the gateway renders the
       // message with its own default template and mails it to PUBLIC_TO.
-      const messageId = await sendMail({ to, subject, text, replyTo });
+      const messageId = await sendMail({ to, subject, text });
       return ok(res, { messageId });
     } catch (err: any) {
       return fail(res, 500, err?.message || 'Failed to send email');

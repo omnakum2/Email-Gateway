@@ -6,8 +6,8 @@ import { ok } from './utils/http';
 
 // Assemble the Express app (no listen here → unit-testable).
 // Each route carries its own guards, so the two tiers stay independent:
-//   /send         → secret API key (server-to-server)
-//   /public-send  → public key + origin allowlist + strict rate limit (browser)
+//   /send-email         → secret API key (server-to-server)
+//   /send-public-email  → public key + origin allowlist + strict rate limit (browser)
 export function buildApp() {
   const app = express();
 

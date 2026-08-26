@@ -16,21 +16,19 @@ function validateEnv(): void {
 async function bootstrap(): Promise<void> {
   validateEnv();
 
-  // Fail fast if SMTP credentials/connection are bad.
+  // Fail fast if credentials/connection are bad.
   try {
     await verifyConnection();
-    console.log('SMTP connection verified');
+    console.log('connection verified');
   } catch (err: any) {
-    console.error(`SMTP verification failed: ${err?.message || err}`);
+    console.error(`verification failed: ${err?.message || err}`);
     process.exit(1);
   }
 
   const app = buildApp();
   const port = Number(process.env.PORT) || 3000;
 
-  const server = app.listen(port, () => {
-    console.log(`Email gateway listening on http://localhost:${port}`);
-  });
+  const server = app.listen(port);
 
   server.on('error', (err: NodeJS.ErrnoException) => {
     if (err.code === 'EADDRINUSE') {

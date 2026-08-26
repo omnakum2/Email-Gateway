@@ -13,6 +13,5 @@ export interface SendMailInput {
   subject: string;
   html?: string;
   text?: string;
-  replyTo?: string;
   attachments?: Attachment[];
 }
