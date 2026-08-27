@@ -1,12 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
-import { allowedOrigins } from '../utils/security';
+import { isOriginAllowed } from '../utils/security';
 
-// Sets CORS headers for allowed origins and answers preflight requests, so that
-// approved browser origins can call the public route. This only enables the
-// browser — the actual server-side origin enforcement lives in publicKeyGuard.
+// Applied globally (before body parsing) so that EVERY response — success, auth
+// error, bad JSON, 404, and preflight — carries CORS headers for allowed origins.
+// Answers OPTIONS preflight with 204. Origin matching is trailing-slash tolerant.
 export function publicCors(req: Request, res: Response, next: NextFunction): void {
   const origin = req.header('Origin');
-  if (origin && allowedOrigins().includes(origin)) {
+  if (origin && isOriginAllowed(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');

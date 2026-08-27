@@ -8,10 +8,22 @@ export function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(bufA, bufB);
 }
 
-// Parse ALLOWED_ORIGINS ("https://a.com,https://b.com") into a clean list.
+// Drop surrounding whitespace and any trailing slash(es) so that a configured
+// "https://site.com/" and a browser-sent "https://site.com" compare equal.
+function normalizeOrigin(origin: string): string {
+  return origin.trim().replace(/\/+$/, '');
+}
+
+// Parse ALLOWED_ORIGINS into a clean, slash-normalized list.
 export function allowedOrigins(): string[] {
   return (process.env.ALLOWED_ORIGINS || '')
     .split(',')
-    .map((o) => o.trim())
+    .map(normalizeOrigin)
     .filter(Boolean);
+}
+
+// Whether an incoming Origin header is allowed (trailing-slash tolerant).
+export function isOriginAllowed(origin?: string): boolean {
+  if (!origin) return false;
+  return allowedOrigins().includes(normalizeOrigin(origin));
 }

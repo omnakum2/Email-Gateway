@@ -3,6 +3,7 @@ import * as dns from 'node:dns';
 dns.setDefaultResultOrder('ipv4first'); // prefer IPv4 so Gmail SMTP connects reliably on serverless
 
 import express from 'express';
+import { publicCors } from './middleware/publicCors';
 import { errorHandler } from './middleware/errorHandler';
 import { emailRouter } from './routes/emailRoute';
 import { publicEmailRouter } from './routes/publicEmailRoute';
@@ -14,6 +15,9 @@ import { ok } from './utils/http';
 export function buildApp() {
   const app = express();
 
+  // CORS first, before body parsing — so every response (success, auth error,
+  // bad JSON, 404, preflight) carries CORS headers for allowed origins.
+  app.use(publicCors);
   app.use(express.json());
 
   // Public, unauthenticated health probe.
@@ -23,6 +27,11 @@ export function buildApp() {
 
   app.use(emailRouter);
   app.use(publicEmailRouter);
+
+  // JSON 404 (carries CORS headers because publicCors already ran).
+  app.use((_req, res) => {
+    res.status(404).json({ success: false, error: 'Not found' });
+  });
 
   // Error handler must be registered last.
   app.use(errorHandler);

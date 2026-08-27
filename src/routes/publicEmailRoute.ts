@@ -1,22 +1,17 @@
 import { Router } from 'express';
 import { fail, ok } from '../utils/http';
 import { sendMail } from '../mailer/mailer';
-import { publicCors } from '../middleware/publicCors';
 import { publicKeyGuard } from '../middleware/publicKey';
 import { requireEnabled } from '../middleware/toggle';
 
 export const publicEmailRouter = Router();
 
-// CORS preflight for the browser.
-publicEmailRouter.options('/send-public-email', publicCors);
-
 // POST /send-public-email — contact-form endpoint safe for direct browser calls.
-// The recipient is ALWAYS the server-configured PUBLIC_TO; callers cannot set it,
-// so a leaked public key can never be used as an open relay to arbitrary addresses.
-// Accepts only: text (required), subject (optional).
+// CORS + preflight are handled globally (see buildApp). The recipient is ALWAYS
+// the server-configured PUBLIC_TO; callers cannot set it, so a leaked public key
+// can never be used as an open relay. Accepts: html and/or text, subject (optional).
 publicEmailRouter.post(
   '/send-public-email',
-  publicCors,
   requireEnabled('PUBLIC_SEND_ENABLED'),
   publicKeyGuard,
   async (req, res) => {
